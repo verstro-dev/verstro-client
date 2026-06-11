@@ -1,0 +1,23 @@
+display_name: Verstro
+
+packager: Verstro
+packagerEmail: hello@mail.verstro.com
+license: Other
+
+priority: optional
+section: x11
+installed_size: 6604
+essential: false
+icon: ./assets/images/icon.png
+
+keywords:
+  - Verstro
+  - Clash
+  - ClashMeta
+  - Proxy
+
+generic_name: Verstro
+
+group: Applications/Internet
+
+startup_notify: true
