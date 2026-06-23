@@ -1,0 +1,28 @@
+display_name: Verstro
+package_name: Verstro
+maintainer:
+  name: Verstro
+  email: hello@mail.verstro.com
+
+priority: optional
+section: x11
+installed_size: 6604
+essential: false
+icon: ./assets/images/icon.png
+
+dependencies:
+  - libayatana-appindicator3-dev
+  - libkeybinder-3.0-dev
+
+keywords:
+  - Verstro
+  - Clash
+  - ClashMeta
+  - Proxy
+
+generic_name: Verstro
+
+categories:
+  - Network
+
+startup_notify: true
