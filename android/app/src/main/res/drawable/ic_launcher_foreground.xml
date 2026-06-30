@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="108dp"
+        android:height="108dp"
+        android:viewportWidth="240"
+        android:viewportHeight="240">
+    <!-- Verstro 几何 V (青). viewport 240, 内容居中且在 adaptive 安全区 (中心 ~60%) 内.
+         由 assets/images/verstro_logo.svg 的 v4 路径按 1024→240 (×0.234) 缩放得到. -->
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M73,69 L101,69 L120,126 L139,69 L167,69 L131,173 Q120,181 109,173 Z" />
+</vector>
