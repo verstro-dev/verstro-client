@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="700" y2="1010" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2B4D72"/>
+      <stop offset="1" stop-color="#0B1726"/>
+    </linearGradient>
+    <linearGradient id="vfill" x1="300" y1="290" x2="724" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7DF2DE"/>
+      <stop offset="1" stop-color="#10A696"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.13"/>
+      <stop offset="0.42" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#sheen)"/>
+  <!-- 精修实心 V: 收窄外形, 顶端切平, 底部圆尖 -->
+  <path fill="url(#vfill)" d="
+    M 312 296
+    L 432 296
+    L 512 540
+    L 592 296
+    L 712 296
+    L 560 740
+    Q 512 772 464 740
+    Z"/>
+</svg>
