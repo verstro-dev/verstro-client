@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Verstro iOS 主 App: 管理 NETunnelProviderManager (装/起/停 VPN profile) 需 Network Extensions 能力 -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<!-- 与 VerstroTunnel 扩展共享容器 (订阅配置 / geo / 日志交接) -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.verstro.app</string>
+	</array>
+</dict>
+</plist>
