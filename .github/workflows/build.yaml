@@ -1,0 +1,269 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*'
+env:
+  IS_STABLE: ${{ !contains(github.ref, '-') }}
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    # Verstro: 兜底挂死 (2026-07-04 android gradle 曾静默挂 90min); 正常单腿 ≤25min
+    timeout-minutes: 60
+    strategy:
+      # Verstro: 不连坐取消 —— 一条腿失败其余照跑, 一次运行看全所有平台的问题
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            os: ubuntu-latest
+          - platform: windows
+            os: Windows-2022
+            arch: amd64
+          - platform: linux
+            os: ubuntu-22.04
+            arch: amd64
+          - platform: macos
+            # amd64 也在 Apple Silicon 上交叉出包 (与本地 release-macos.sh 同路径):
+            # macos-15-intel 没有 Xcode 26 (Apple 停止 Intel 支持), 编不过需要
+            # macOS 26 SDK 的 connectivity_plus 7.x
+            os: macos-15
+            arch: amd64
+          - platform: macos
+            # 钉 macos-15: macos-latest 已迁移 macOS 26 (2026-06-15 起),
+            # 其 SDK 编不过 connectivity_plus 7.1.1 (NWPath.isUltraConstrained)
+            os: macos-15
+            arch: arm64
+          #          - platform: windows
+          #            os: windows-11-arm
+          #            arch: arm64
+          - platform: linux
+            os: ubuntu-24.04-arm
+            arch: arm64
+
+    steps:
+      - name: Setup rust
+        if: startsWith(matrix.os, 'windows-11-arm')
+        run: |
+          Invoke-WebRequest -Uri "https://win.rustup.rs/aarch64" -OutFile rustup-init.exe
+          .\rustup-init.exe -y --default-toolchain stable
+          $cargoPath = "$env:USERPROFILE\.cargo\bin"
+          Add-Content $env:GITHUB_PATH $cargoPath
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        if: startsWith(matrix.platform,'android')
+        # ubuntu-latest 根分区仅 ~14GB 可用, Flutter+NDK+Go 多 ABI 构建会写满
+        # (2026-07-04 实测 errno 28; 更早一轮 gradle 静默挂死疑为同因)。
+        # 清理与本构建无关的预装大件, 可腾 20-30GB; 保留 /usr/local/lib/android
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/share/boost /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/lib/node_modules /usr/local/julia* /opt/az /usr/share/swift
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
+
+      - name: Setup Android Signing
+        if: startsWith(matrix.platform,'android')
+        # Verstro: google-services.json 注入已删 (Firebase 于 2.5 移除); 签名走
+        # keystore.jks + local.properties 三键, 与本地 release-android.sh 同一套凭证
+        run: |
+          echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/local.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/local.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/local.properties
+
+      - name: Select newest Xcode
+        if: startsWith(matrix.platform,'macos')
+        # 镜像默认 Xcode 16.4, 但 connectivity_plus 7.x 需要 macOS 26 SDK
+        # (NWPath.isUltraConstrained); 动态选镜像里版本号最大的 Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          echo "使用 $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Setup Linux dependencies
+        if: startsWith(matrix.platform,'linux')
+        # flutter_secure_storage_linux (Verstro 加的 token 存储) 需要 libsecret;
+        # ubuntu-22.04 amd64 镜像自带, ubuntu-24.04-arm 没有
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache-dependency-path: |
+            core/go.sum
+
+      - name: Setup Flutter
+        if: ${{ !(startsWith(matrix.os, 'windows-11-arm') || startsWith(matrix.os, 'ubuntu-24.04-arm')) }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.7
+          cache: true
+      - name: Setup Flutter With Other
+        if: startsWith(matrix.os, 'windows-11-arm') || startsWith(matrix.os, 'ubuntu-24.04-arm')
+        uses: subosito/flutter-action@v2
+        with:
+          channel: master
+          flutter-version: 3.35.7
+          cache: true
+
+      - name: Get Flutter Dependency
+        run: |
+          flutter --version
+          flutter pub get
+
+      - name: Setup
+        run: dart setup.dart ${{ matrix.platform }} ${{ matrix.arch && format('--arch {0}', matrix.arch) }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }}
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
+          path: ./dist
+          overwrite: true
+
+  changelog:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        if: ${{ env.IS_STABLE == 'true' }}
+        with:
+          fetch-depth: 0
+          # Verstro: 发布分支是 dev (上游用 main); changelog 生成与提交都要落在 dev
+          ref: refs/heads/dev
+      - name: Generate
+        if: ${{ env.IS_STABLE == 'true' }}
+        run: |
+          last_ver=$(grep -m1 '^## ' CHANGELOG.md 2>/dev/null | sed 's/^## //')
+          
+          tags=($(git tag --merged HEAD --sort=-creatordate))
+          
+          temp="NEW_CHANGELOG.md" > "$temp"
+          
+          for i in "${!tags[@]}"; do
+              curr="${tags[i]}"
+              [[ "$curr" == "$last_ver" ]] && break
+          
+              prev="${tags[i+1]}"
+              range="${prev:+$prev..}$curr"
+          
+              echo -e "## $curr\n" >> "$temp"
+              git log --no-merges --pretty=format:"%s" "$range" | \
+              awk '!/Update changelog/ && NF {print "- " $0 "\n"}' >> "$temp"
+          done
+          [ -f CHANGELOG.md ] && cat CHANGELOG.md >> "$temp"
+          
+          mv "$temp" CHANGELOG.md
+
+      - name: Commit
+        if: ${{ env.IS_STABLE == 'true' }}
+        run: |
+          git add CHANGELOG.md
+          if ! git diff --cached --quiet; then
+            echo "Commit pushing"
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -m "Update changelog"
+            git push
+            if [ $? -eq 0 ]; then
+              echo "Push succeeded"
+            else
+              echo "Push failed"
+              exit 1
+            fi
+          fi
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload:
+    permissions: write-all
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    services:
+      telegram-bot-api:
+        image: aiogram/telegram-bot-api:latest
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        ports:
+          - 8081:8081
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist/
+          pattern: artifact-*
+          merge-multiple: true
+
+      - name: Generate release.md
+        run: |
+          tags=($(git tag --merged HEAD --sort=-creatordate))
+          preTag=$(curl -s -H "Authorization: Bearer ${{ github.token }}" \
+          "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+          sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
+          
+          [ -z "$preTag" ] && preTag=""
+          
+          out="release.md" > "$out"
+          
+          for i in "${!tags[@]}"; do
+            curr="${tags[i]}"
+            [[ "$curr" == "$preTag" ]] && break
+          
+            prev="${tags[i+1]}"
+            range="${prev:+$prev..}$curr"
+          
+            git log --no-merges --pretty=format:"%s" "$range" | \
+            awk '!/Update changelog/ && NF {print "- " $0 "\n"}' >> "$out"
+          done
+      - name: Push to telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_RELEASE_CHAT_ID: ${{ secrets.TELEGRAM_RELEASE_CHAT_ID }}
+          TAG: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+          python release_telegram.py
+
+      - name: Patch release.md
+        run: |
+          version=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          sed "s|VERSION|$version|g" ./.github/release_template.md >> release.md
+
+      - name: Generate sha256
+        if: env.IS_STABLE == 'true'
+        run: |
+          cd ./dist
+          for file in $(find . -type f -not -name "*.sha256"); do
+            sha256sum "$file" > "${file}.sha256"
+          done  
+
+      - name: Release
+        if: ${{ env.IS_STABLE == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./dist/*
+          body_path: './release.md'
+
