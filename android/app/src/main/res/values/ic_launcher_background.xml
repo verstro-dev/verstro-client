@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Verstro 深靛蓝 (v4 logo 背景渐变中间调; adaptive 背景用纯色更稳/更清晰) -->
+    <color name="ic_launcher_background">#16293F</color>
+</resources>
