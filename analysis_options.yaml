@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+analyzer:
+  exclude:
+    - lib/l10n/intl/**
+    # 本仓仅消费这些第三方 git submodule；各包需在自身工作区单独分析。
+    - plugins/**
+  errors:
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    prefer_single_quotes: true
