@@ -1,0 +1,18 @@
+display_name: Verstro
+
+icon: ./assets/images/icon.png
+
+keywords:
+  - Verstro
+  - Clash
+  - ClashMeta
+  - Proxy
+
+generic_name: Verstro
+
+categories:
+  - Network
+
+startup_notify: true
+
+include: []
