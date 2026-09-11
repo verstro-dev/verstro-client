@@ -1,0 +1,46 @@
+display_name: Verstro
+# Debian 包名规范要求全小写 (^[a-z0-9][a-z0-9+.-]+$)。旧版误用大写 Verstro,
+# 导致 `apt remove verstro` 定位不到 (apt 严格按规范, dpkg 才容忍大写)。改小写后
+# apt/dnf 卸载正常; 产物文件名不受影响 (走 distribute_options.yaml 的 app_name)。
+package_name: verstro
+# 平滑替换旧的大写包: 装 verstro 时自动移除历史遗留的 Verstro (否则两个包并存)。
+conflicts:
+  - Verstro
+replaces:
+  - Verstro
+maintainer:
+  name: Verstro
+  email: hello@mail.verstro.com
+
+priority: optional
+section: x11
+installed_size: 6604
+essential: false
+icon: ./assets/images/icon.png
+
+dependencies:
+  - libayatana-appindicator3-dev
+  - libkeybinder-3.0-dev
+
+# 安装/升级后给核心二进制补 setuid root。TUN(虚拟网卡)要求 FlClashCore 以 root
+# 建网卡; 覆盖安装会把该文件重装成全新的、清掉 setuid 位 → 用户每次升级都得重新
+# 提权、且提权流程 bug 会无限弹密码框 (见 controller._requestAdmin 修复)。这里在
+# postinst 里一次性设好, 用户永远不会遇到弹框。路径 /usr/share/FlClash/ 由
+# appBinaryName=CMake BINARY_NAME(FlClash) 决定, 与 package_name 无关。
+# (postinst 以 root 运行; dpkg-deb --root-owner-group 已保证文件 root:root。)
+postinstall_scripts:
+  - chown root:root /usr/share/FlClash/FlClashCore
+  - chmod u+s /usr/share/FlClash/FlClashCore
+
+keywords:
+  - Verstro
+  - Clash
+  - ClashMeta
+  - Proxy
+
+generic_name: Verstro
+
+categories:
+  - Network
+
+startup_notify: true
