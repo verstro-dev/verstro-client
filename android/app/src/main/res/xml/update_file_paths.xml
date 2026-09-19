@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Verstro 应用内升级 FileProvider 路径. 覆盖 cacheDir(= Dart getTemporaryDirectory()),
+     升级 APK 下到这里, 交给系统安装器. -->
+<paths>
+    <cache-path
+        name="update_cache"
+        path="." />
+    <external-cache-path
+        name="update_ext_cache"
+        path="." />
+</paths>
